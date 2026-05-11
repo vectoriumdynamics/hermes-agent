@@ -1,0 +1,53 @@
+name: Dependabot auto-merge
+
+# Auto-merges Dependabot security PRs for patch+minor version bumps.
+# Major version security bumps get a comment requesting manual review.
+# Non-security Dependabot PRs are left for Marc to review.
+
+on: pull_request
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  dependabot-auto-merge:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    steps:
+      - name: Fetch Dependabot metadata
+        id: meta
+        uses: dependabot/fetch-metadata@v2
+        with:
+          github-token: "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Log PR context
+        run: |
+          echo "PR: ${{ github.event.pull_request.html_url }}"
+          echo "Dependency: ${{ steps.meta.outputs.dependency-names }}"
+          echo "Update type: ${{ steps.meta.outputs.update-type }}"
+          echo "Alert state: ${{ steps.meta.outputs.alert-state }}"
+          echo "Severity: ${{ steps.meta.outputs.ghsa-id }}"
+          echo "Dependency type: ${{ steps.meta.outputs.dependency-type }}"
+
+      - name: Auto-merge security patch+minor (critical/high CVEs)
+        if: |
+          steps.meta.outputs.alert-state == 'OPEN' &&
+          (steps.meta.outputs.update-type == 'version-update:semver-patch' ||
+           steps.meta.outputs.update-type == 'version-update:semver-minor')
+        run: |
+          echo "[AUTO-MERGE] security update qualifies"
+          gh pr merge --auto --squash "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Flag major-version security updates for manual review
+        if: |
+          steps.meta.outputs.alert-state == 'OPEN' &&
+          steps.meta.outputs.update-type == 'version-update:semver-major'
+        run: |
+          gh pr comment "$PR_URL" --body "@marcjupiter — this security update is a **major version bump** (\`${{ steps.meta.outputs.update-type }}\`). Auto-merge intentionally skipped. Please review the changelog (link in PR body) and merge manually if safe."
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
