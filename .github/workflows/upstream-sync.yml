@@ -1,0 +1,53 @@
+name: Upstream Sync
+
+# Sync vectoriumdynamics/hermes-agent fork main with NousResearch/hermes-agent main.
+# Lives at .github/workflows/upstream-sync.yml in the fork's main branch.
+
+on:
+  schedule:
+    - cron: '0 10 * * *'  # 6 AM ET daily (10:00 UTC)
+  workflow_dispatch:      # manual trigger button in Actions tab
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout fork
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.SYNC_TOKEN }}
+
+      - name: Sync from upstream (auto-merge if clean)
+        id: sync
+        uses: aormsby/Fork-Sync-With-Upstream-action@v3.4
+        continue-on-error: true
+        with:
+          target_sync_branch: main
+          target_repo_token: ${{ secrets.SYNC_TOKEN }}
+          upstream_sync_branch: main
+          upstream_sync_repo: NousResearch/hermes-agent
+          test_mode: false
+
+      - name: Report result
+        run: |
+          echo "Sync had_new_commits: ${{ steps.sync.outputs.has_new_commits }}"
+          echo "Sync status: ${{ steps.sync.outcome }}"
+
+      - name: Open PR on conflict
+        if: steps.sync.outcome == 'failure'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.SYNC_TOKEN }}
+          title: '🔀 Upstream sync — manual review needed'
+          body: |
+            Automatic upstream sync from `NousResearch/hermes-agent:main` failed,
+            likely due to merge conflicts.
+
+            Resolve and merge manually.
+          branch: upstream-sync-${{ github.run_number }}
+          labels: upstream-sync, needs-review
