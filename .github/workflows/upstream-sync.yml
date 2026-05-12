@@ -24,7 +24,7 @@ jobs:
 
       - name: Sync from upstream (auto-merge if clean)
         id: sync
-        uses: aormsby/Fork-Sync-With-Upstream-action@v3.4
+        uses: aormsby/Fork-Sync-With-Upstream-action@v3.4.5
         continue-on-error: true
         with:
           target_sync_branch: main
@@ -40,7 +40,7 @@ jobs:
 
       - name: Open PR on conflict
         if: steps.sync.outcome == 'failure'
-        uses: peter-evans/create-pull-request@v6
+        uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ secrets.SYNC_TOKEN }}
           title: '🔀 Upstream sync — manual review needed'
